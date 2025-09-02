@@ -10,6 +10,7 @@ import UIKit
 
 struct ContentView: View {
     @ObservedObject var store: ChecklistStore
+    @Binding var selectedTab: AppTab
     @StateObject private var profileStore = ProfileStore()
     @State private var dayOffset: Int = 0
     @State private var cachedAvatar: UIImage? = nil
@@ -26,9 +27,6 @@ struct ContentView: View {
 
     // 新增：按钮切换到明天时用于控制下层卡片“更慢”的上浮动画
     @State private var stackReveal: CGFloat = 0
-
-    @State private var isShowingDatePicker: Bool = false
-    @State private var selectedDate: Date = Date()
 
     @State private var isShowingProfile = false
     @State private var isShowingSearch = false
@@ -116,7 +114,6 @@ struct ContentView: View {
         // 已移除：屏幕边缘滑动唤出日期选择与 Profile
         // 避免键盘改变全局安全区导致顶栏/头像重新布局
         .ignoresSafeArea(.keyboard, edges: .bottom)
-        .sheet(isPresented: $isShowingDatePicker) { datePickerSheet }
         .sheet(isPresented: $isShowingProfile) { ProfileView(store: profileStore, checklist: store) }
         .sheet(isPresented: $isShowingSearch) {
             GlobalSearchView(store: store) { d, _ in
@@ -156,36 +153,6 @@ struct ContentView: View {
         .onChange(of: profileStore.profile.avatarImageData) { _ in refreshAvatarCache() }
     }
 
-    private var datePickerSheet: some View {
-        NavigationView {
-            VStack(alignment: .leading, spacing: 12) {
-                DatePicker(
-                    "选择日期",
-                    selection: $selectedDate,
-                    displayedComponents: [.date]
-                )
-                .datePickerStyle(.graphical)
-                .padding(.horizontal)
-                .onChange(of: selectedDate) { newValue in
-                    dayOffset = daysBetween(startOf: Calendar.current.startOfDay(for: Date()), and: Calendar.current.startOfDay(for: newValue))
-                }
-                Spacer()
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("今天") {
-                        // 修复：点“今天”后同步更新 DatePicker 的选中日期
-                        selectedDate = Date()
-                        animateGoToToday()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) { Button("完成") { isShowingDatePicker = false } }
-            }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
     // MARK: - 叠层参数（仅左滑时用来露出下一张）
     private var progress: CGFloat { min(max(abs(dragOffset.width) / swipeThreshold, 0), 1) }
     private var smoothProgress: CGFloat { smooth(progress) }
@@ -200,17 +167,10 @@ struct ContentView: View {
     // MARK: - 顶部栏
     private var topBar: some View {
         HStack {
-            Button { isShowingDatePicker = true } label: {
-                Image(systemName: "calendar.circle.fill")
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(profileStore.profile.theme.primary, .white)
-                    .font(.system(size: 26))
-            }
+            AppTabPicker(selected: $selectedTab)
+
             Spacer()
-            Text("doAI")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.primary)
-            Spacer()
+
             HStack(spacing: 10) {
                 Button { isShowingSearch = true } label: {
                     Image(systemName: "magnifyingglass.circle.fill")
@@ -226,6 +186,11 @@ struct ContentView: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+        .overlay(alignment: .center) {
+            Text("doAI")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(.primary)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)

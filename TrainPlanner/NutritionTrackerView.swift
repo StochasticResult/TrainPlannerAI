@@ -4,6 +4,7 @@ struct NutritionTrackerView: View {
     @ObservedObject var store: NutritionStore
     let initialDate: Date
     let theme: ThemeColor
+    @Binding var selectedTab: AppTab
     @State private var dayOffset: Int = 0
     @State private var newMealText: String = ""
     @State private var isShowingAISheet: Bool = false
@@ -23,6 +24,10 @@ struct NutritionTrackerView: View {
 
     var body: some View {
         VStack(spacing: 16) {
+            HStack {
+                tabPicker
+                Spacer()
+            }
             header
             Divider()
             card
@@ -40,6 +45,10 @@ struct NutritionTrackerView: View {
             Spacer()
             Button { dayOffset += 1 } label: { Image(systemName: "chevron.right").font(.system(size: 18, weight: .semibold)) }
         }
+    }
+
+    private var tabPicker: some View {
+        AppTabPicker(selected: $selectedTab)
     }
 
     private var card: some View {
