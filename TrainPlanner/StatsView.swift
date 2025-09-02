@@ -1,0 +1,102 @@
+import SwiftUI
+
+struct StatsView: View {
+    @ObservedObject var store: ChecklistStore
+
+    enum RangeKind: String, CaseIterable, Identifiable { case last7 = "近7天", last30 = "近30天", all = "全部"; var id: String { rawValue } }
+    @State private var range: RangeKind = .last7
+
+    private var filteredTasks: [DailyTask] {
+        switch range {
+        case .all:
+            return Array(store.tasksById.values)
+        case .last7:
+            return filterBy(days: 7)
+        case .last30:
+            return filterBy(days: 30)
+        }
+    }
+
+    private var total: Int { filteredTasks.count }
+    private var doneCount: Int { filteredTasks.filter({ $0.isDone }).count }
+    private var todoCount: Int { total - doneCount }
+
+    private var labelCounts: [(String, Int)] {
+        let labels = filteredTasks.flatMap { $0.labels }
+        let grouped = Dictionary(grouping: labels, by: { $0 })
+        return grouped.map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }
+    }
+
+    private var priorityCounts: [(TaskPriority, Int)] {
+        let grouped = Dictionary(grouping: filteredTasks, by: { $0.priority })
+        return TaskPriority.allCases.map { p in (p, grouped[p]?.count ?? 0) }
+    }
+
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    Picker("范围", selection: $range) {
+                        ForEach(RangeKind.allCases) { r in Text(r.rawValue).tag(r) }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                Section(header: Text("整体")) {
+                    HStack {
+                        Text("总任务")
+                        Spacer()
+                        Text("\(total)")
+                    }
+                    HStack {
+                        Text("已完成")
+                        Spacer()
+                        Text("\(doneCount)")
+                    }
+                    HStack {
+                        Text("未完成")
+                        Spacer()
+                        Text("\(todoCount)")
+                    }
+                    ProgressView(value: total == 0 ? 0 : Double(doneCount) / Double(total)) {
+                        Text("完成率")
+                    }
+                }
+
+                Section(header: Text("优先级")) {
+                    ForEach(priorityCounts, id: \.0) { (p, c) in
+                        HStack {
+                            Text(p.displayName)
+                            Spacer()
+                            Text("\(c)")
+                        }
+                    }
+                }
+
+                Section(header: Text("标签 Top 10")) {
+                    ForEach(Array(labelCounts.prefix(10)), id: \.0) { (label, c) in
+                        HStack {
+                            Text(label)
+                            Spacer()
+                            Text("\(c)")
+                        }
+                    }
+                    if labelCounts.isEmpty {
+                        Text("暂无标签数据").foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("统计")
+        }
+    }
+
+    private func filterBy(days: Int) -> [DailyTask] {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: Date().addingTimeInterval(TimeInterval(-days * 86400)))
+        return store.tasksById.values.filter { t in
+            let day = cal.startOfDay(for: t.startAt ?? t.createdAt)
+            return day >= start
+        }
+    }
+}
+
+
