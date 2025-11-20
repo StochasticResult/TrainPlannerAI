@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit // Added UIKit for UIImagePickerController
 
 // 已移除：AI 建议 Chip
 
@@ -193,4 +194,40 @@ public struct MacroMiniCard: View {
     }
 }
 
+// MARK: - Image Picker
+public struct ImagePicker: UIViewControllerRepresentable {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var image: UIImage?
+    var sourceType: UIImagePickerController.SourceType = .photoLibrary
+    
+    public init(image: Binding<UIImage?>, sourceType: UIImagePickerController.SourceType = .photoLibrary) {
+        self._image = image
+        self.sourceType = sourceType
+    }
 
+    public func makeUIViewController(context: Context) -> some UIViewController {
+        let picker = UIImagePickerController()
+        if UIImagePickerController.isSourceTypeAvailable(sourceType) {
+            picker.sourceType = sourceType
+        }
+        picker.allowsEditing = true
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    public func updateUIViewController(_ uiViewController: UIViewControllerType, context: Context) {}
+
+    public func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    public final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let parent: ImagePicker
+        init(_ parent: ImagePicker) { self.parent = parent }
+        public func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage {
+                parent.image = image
+            }
+            parent.dismiss()
+        }
+        public func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { parent.dismiss() }
+    }
+}

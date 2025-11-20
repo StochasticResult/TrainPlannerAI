@@ -2,18 +2,28 @@ import SwiftUI
 
 struct TaskEditorView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var langMgr = LanguageManager.shared // Observe language changes
+    @StateObject private var langMgr = LanguageManager.shared
 
     let task: DailyTask
     let onSave: (String, Date?, Date?, RepeatRule, Date?, TaskPriority, String, [String], Int?, [Int]) -> Void
 
+    // Form States
     @State private var title: String
-    @State private var startAt: Date?
-    @State private var dueDate: Date?
-    @State private var repeatRule: RepeatRule
-    @State private var repeatEnd: Date?
-    @State private var priority: TaskPriority
     @State private var notes: String
+    
+    // Time
+    @State private var hasStartTime: Bool
+    @State private var startAt: Date
+    @State private var hasDueDate: Bool
+    @State private var dueDate: Date
+    
+    // Repeat
+    @State private var repeatRule: RepeatRule
+    @State private var hasRepeatEnd: Bool
+    @State private var repeatEnd: Date
+    
+    // Details
+    @State private var priority: TaskPriority
     @State private var labelsText: String
     @State private var durationMinutes: Int?
     @State private var reminderOffsetsText: String
@@ -21,81 +31,185 @@ struct TaskEditorView: View {
     init(task: DailyTask, onSave: @escaping (String, Date?, Date?, RepeatRule, Date?, TaskPriority, String, [String], Int?, [Int]) -> Void) {
         self.task = task
         self.onSave = onSave
+        
         _title = State(initialValue: task.title)
-        _startAt = State(initialValue: task.startAt)
-        _dueDate = State(initialValue: task.dueDate)
-        _repeatRule = State(initialValue: task.repeatRule)
-        _repeatEnd = State(initialValue: task.repeatEndDate)
-        _priority = State(initialValue: task.priority)
         _notes = State(initialValue: task.notes)
+        
+        let start = task.startAt
+        _hasStartTime = State(initialValue: start != nil)
+        _startAt = State(initialValue: start ?? Date())
+        
+        let due = task.dueDate
+        _hasDueDate = State(initialValue: due != nil)
+        _dueDate = State(initialValue: due ?? Date())
+        
+        _repeatRule = State(initialValue: task.repeatRule)
+        
+        let rEnd = task.repeatEndDate
+        _hasRepeatEnd = State(initialValue: rEnd != nil)
+        _repeatEnd = State(initialValue: rEnd ?? Date().addingTimeInterval(7*24*3600))
+        
+        _priority = State(initialValue: task.priority)
         _labelsText = State(initialValue: task.labels.joined(separator: ", "))
         _durationMinutes = State(initialValue: task.durationMinutes)
         _reminderOffsetsText = State(initialValue: task.reminderOffsets.map { String($0) }.joined(separator: ", "))
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
-                Section(header: Text(L("field.title"))) { TextField(L("field.title"), text: $title) }
-                Section(header: Text(L("field.start_due")), footer: Text(repeatRule != .none ? L("status.conflict_due") : "")) {
-                    Toggle(isOn: Binding(get: { startAt != nil }, set: { $0 ? (startAt = startAt ?? Date()) : (startAt = nil) })) { Text(L("field.enable_start")) }
-                    if startAt != nil { DatePicker(L("field.start_time"), selection: Binding(get: { startAt ?? Date() }, set: { startAt = $0 }), displayedComponents: [.date, .hourAndMinute]) }
-                    Toggle(isOn: Binding(get: { dueDate != nil }, set: { on in
-                        if on {
-                            // 开启截止则清空重复
-                            repeatRule = .none
-                            repeatEnd = nil
-                            dueDate = dueDate ?? Date()
-                        } else {
-                            dueDate = nil
-                        }
-                    })) { Text(L("field.enable_due")) }
-                    .disabled(repeatRule != .none)
-                    if dueDate != nil { DatePicker(L("field.due_time"), selection: Binding(get: { dueDate ?? Date() }, set: { dueDate = $0 }), displayedComponents: [.date, .hourAndMinute]) }
+                // 1. 核心信息区
+                Section {
+                    TextField(L("field.title"), text: $title)
+                        .font(.body)
+                    
+                    TextField(L("field.notes"), text: $notes, axis: .vertical)
+                        .lineLimit(3...6)
+                        .foregroundStyle(.secondary)
                 }
-                Section(header: Text(L("field.repeat")), footer: Text(dueDate != nil ? L("status.conflict_repeat") : "")) {
-                    Picker(L("field.repeat_rule"), selection: Binding(get: { repeatRule }, set: { newValue in
-                        // 设置重复则清空截止
-                        repeatRule = newValue
-                        if newValue != .none {
-                            dueDate = nil
+                
+                // 2. 时间与重复
+                Section {
+                    // Start Time
+                    Toggle(isOn: $hasStartTime) {
+                        Label {
+                            Text(L("field.start_time"))
+                        } icon: {
+                            Image(systemName: "clock").foregroundStyle(.blue)
                         }
-                    })) {
+                    }
+                    if hasStartTime {
+                        DatePicker(L("field.start_time"), selection: $startAt, displayedComponents: [.date, .hourAndMinute])
+                            .labelsHidden()
+                            .datePickerStyle(.graphical)
+                    }
+                    
+                    // Due Date
+                    Toggle(isOn: $hasDueDate.animation()) {
+                        Label {
+                            Text("截止日期")
+                        } icon: {
+                            Image(systemName: "calendar.badge.exclamationmark").foregroundStyle(.red)
+                        }
+                    }
+                    .disabled(repeatRule != .none) // 互斥逻辑
+                    
+                    if hasDueDate {
+                        DatePicker("截止时间", selection: $dueDate, displayedComponents: [.date, .hourAndMinute])
+                    }
+                    
+                    // Repeat
+                    Picker(selection: $repeatRule) {
                         Text(L("rep.none")).tag(RepeatRule.none)
                         Text(L("rep.every_day")).tag(RepeatRule.everyDay)
-                        Text(L("rep.every_2_days")).tag(RepeatRule.everyNDays(2))
-                        Text(L("rep.every_3_days")).tag(RepeatRule.everyNDays(3))
                         Text(L("rep.every_7_days")).tag(RepeatRule.everyNDays(7))
+                        // 更多选项可按需添加
+                    } label: {
+                        Label {
+                            Text(L("field.repeat"))
+                        } icon: {
+                            Image(systemName: "repeat").foregroundStyle(.gray)
+                        }
                     }
-                    .disabled(dueDate != nil)
+                    .disabled(hasDueDate) // 互斥逻辑
+                    
                     if repeatRule != .none {
-                        Toggle(isOn: Binding(get: { repeatEnd != nil }, set: { $0 ? (repeatEnd = repeatEnd ?? Date().addingTimeInterval(7*24*3600)) : (repeatEnd = nil) })) { Text(L("field.repeat_end")) }
-                        if repeatEnd != nil { DatePicker(L("field.end_date"), selection: Binding(get: { repeatEnd ?? Date() }, set: { repeatEnd = $0 }), displayedComponents: [.date]) }
+                        Toggle("设置结束日期", isOn: $hasRepeatEnd.animation())
+                        if hasRepeatEnd {
+                            DatePicker("结束日", selection: $repeatEnd, displayedComponents: .date)
+                        }
+                    }
+                } header: {
+                    Text("时间与日程")
+                } footer: {
+                    if repeatRule != .none {
+                        Text(L("status.conflict_due"))
+                    } else if hasDueDate {
+                        Text(L("status.conflict_repeat"))
                     }
                 }
-                Section(header: Text(L("field.prio_tags"))) {
-                    Picker(L("field.priority"), selection: $priority) { ForEach(TaskPriority.allCases) { p in Text(p.displayName).tag(p) } }
-                    .pickerStyle(.menu)
-                    TextField(L("field.tags_hint"), text: $labelsText)
+                
+                // 3. 属性与标签
+                Section {
+                    Picker(selection: $priority) {
+                        ForEach(TaskPriority.allCases) { p in
+                            Text(p.displayName).tag(p)
+                        }
+                    } label: {
+                        Label {
+                            Text(L("field.priority"))
+                        } icon: {
+                            Image(systemName: "flag.fill").foregroundStyle(priorityColor(priority))
+                        }
+                    }
+                    
+                    HStack {
+                        Label {
+                            Text("标签")
+                        } icon: {
+                            Image(systemName: "tag.fill").foregroundStyle(.blue)
+                        }
+                        Spacer()
+                        TextField("例如: 工作, 学习", text: $labelsText)
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                Section(header: Text(L("field.notes"))) { TextEditor(text: $notes).frame(minHeight: 80) }
-                Section(header: Text(L("field.duration_remind"))) {
-                    TextField(L("field.duration_hint"), text: Binding(get: { durationMinutes.map { String($0) } ?? "" }, set: { durationMinutes = Int($0.filter { $0.isNumber }) })).keyboardType(.numberPad)
-                    TextField(L("field.reminder_hint"), text: $reminderOffsetsText)
+                
+                // 4. 高级
+                Section("高级") {
+                    HStack {
+                        Text("预计时长 (分钟)")
+                        Spacer()
+                        TextField("0", value: $durationMinutes, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                    }
+                    
+                    HStack {
+                        Text("提前提醒 (分钟)")
+                        Spacer()
+                        TextField("例如: 10, 30", text: $reminderOffsetsText)
+                            .multilineTextAlignment(.trailing)
+                    }
                 }
             }
-            .navigationTitle(L("nav.edit_task"))
+            .navigationTitle(title.isEmpty ? L("nav.edit_task") : title)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L("act.cancel")) { dismiss() }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L("act.save")) {
-                        let labels = labelsText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-                        let offsets = reminderOffsetsText.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
-                        onSave(title, dueDate, startAt, repeatRule, repeatEnd, priority, notes, labels, durationMinutes, offsets)
-                        dismiss()
+                        save()
                     }
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                ToolbarItem(placement: .cancellationAction) { Button(L("act.cancel")) { dismiss() } }
             }
+        }
+    }
+    
+    private func save() {
+        let labels = labelsText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        let offsets = reminderOffsetsText.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        
+        // 构造最终参数
+        let finalStart = hasStartTime ? startAt : nil
+        let finalDue = hasDueDate ? dueDate : nil
+        let finalRepeatEnd = (repeatRule != .none && hasRepeatEnd) ? repeatEnd : nil
+        
+        onSave(title, finalDue, finalStart, repeatRule, finalRepeatEnd, priority, notes, labels, durationMinutes, offsets)
+        dismiss()
+    }
+    
+    private func priorityColor(_ p: TaskPriority) -> Color {
+        switch p {
+        case .high: return .red
+        case .medium: return .orange
+        case .low: return .blue
+        default: return .gray
         }
     }
 }
