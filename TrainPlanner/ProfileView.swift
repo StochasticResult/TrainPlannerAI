@@ -5,6 +5,7 @@ struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var store: ProfileStore
     @ObservedObject var checklist: ChecklistStore
+    @StateObject private var langMgr = LanguageManager.shared
 
     @State private var showingImagePicker = false
     @State private var inputImage: UIImage? = nil
@@ -12,7 +13,7 @@ struct ProfileView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("头像")) {
+                Section(header: Text(L("prof.avatar"))) {
                     HStack {
                         Spacer()
                         Button {
@@ -39,19 +40,25 @@ struct ProfileView: View {
                     }
                 }
 
-                Section(header: Text("基本信息")) {
-                    TextField("昵称", text: Binding(
+                Section(header: Text(L("prof.basic_info"))) {
+                    TextField(L("prof.nickname"), text: Binding(
                         get: { store.profile.displayName },
                         set: { store.setDisplayName($0) }
                     ))
-                    TextField("签名", text: Binding(
+                    TextField(L("prof.bio"), text: Binding(
                         get: { store.profile.bio },
                         set: { store.setBio($0) }
                     ))
+                    // Language Switcher
+                    Picker(L("prof.language"), selection: $langMgr.currentLanguage) {
+                        ForEach(AppLanguage.allCases) { lang in
+                            Text(lang.rawValue).tag(lang)
+                        }
+                    }
                 }
 
-                Section(header: Text("主题")) {
-                    Picker("颜色", selection: Binding(
+                Section(header: Text(L("prof.theme"))) {
+                    Picker(L("prof.color"), selection: Binding(
                         get: { store.profile.theme },
                         set: { store.setTheme($0) }
                     )) {
@@ -64,7 +71,7 @@ struct ProfileView: View {
                     }
                     // 即时预览卡片
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("预览")
+                        Text(L("prof.preview"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         ZStack {
@@ -77,11 +84,11 @@ struct ProfileView: View {
                                 .shadow(color: store.profile.theme.primary.opacity(0.18), radius: 12, x: 0, y: 8)
                             HStack(spacing: 8) {
                                 Circle().fill(store.profile.theme.primary).frame(width: 8, height: 8)
-                                Text("今日进度 · 68%")
+                                Text(L("ui.today_progress") + " · 68%")
                                     .font(.footnote)
                                     .foregroundStyle(.primary)
                                 Spacer()
-                                Text("未完推明天")
+                                Text(L("ui.defer_tmr"))
                                     .font(.caption2)
                                     .padding(.horizontal, 8).padding(.vertical, 4)
                                     .background(Capsule().fill(store.profile.theme.primary.opacity(0.15)))
@@ -92,7 +99,7 @@ struct ProfileView: View {
                     }
                     // 主题预设网格
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("主题预设")
+                        Text(L("prof.theme_presets"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
@@ -123,14 +130,14 @@ struct ProfileView: View {
                     }
                 }
 
-                Section(header: Text("每日提醒")) {
-                    Toggle("开启提醒", isOn: Binding(
+                Section(header: Text(L("prof.daily_reminder"))) {
+                    Toggle(L("prof.enable_reminder"), isOn: Binding(
                         get: { store.profile.reminderEnabled },
                         set: { store.setReminder(enabled: $0) }
                     ))
                     if store.profile.reminderEnabled {
                         DatePicker(
-                            "时间",
+                            L("prof.time"),
                             selection: Binding(
                                 get: {
                                     var comp = DateComponents()
@@ -148,26 +155,24 @@ struct ProfileView: View {
                     }
                 }
 
-                Section(header: Text("iCloud"), footer: Text("开启后会通过 iCloud Key-Value Store 同步任务与排序。")) {
-                    Toggle("启用 iCloud 同步", isOn: Binding(
+                Section(header: Text(L("prof.icloud")), footer: Text(L("prof.icloud_hint"))) {
+                    Toggle(L("act.sync_now"), isOn: Binding(
                         get: { checklist.iCloudEnabled },
                         set: { checklist.setICloudSyncEnabled($0) }
                     ))
-                    Button("立即同步") { checklist.syncNow() }
+                    Button(L("act.sync_now")) { checklist.syncNow() }
                         .disabled(!checklist.iCloudEnabled)
                 }
-
-                // 最近删除独立页面，不在此直接列出
             }
-            .navigationTitle("我的档案")
+            .navigationTitle(L("tab.profile"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button(L("act.complete")) { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
                     HStack(spacing: 12) {
-                        NavigationLink(destination: RecentlyDeletedView(checklist: checklist)) { Text("最近删除") }
-                        NavigationLink(destination: StatsView(store: checklist)) { Text("统计") }
+                        NavigationLink(destination: RecentlyDeletedView(checklist: checklist)) { Text(L("nav.deleted")) }
+                        NavigationLink(destination: StatsView(store: checklist)) { Text(L("tab.stats")) }
                     }
                 }
             }
@@ -179,7 +184,7 @@ struct ProfileView: View {
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "wand.and.stars").foregroundStyle(.purple)
-                            Text("AI 助手设置").font(.body)
+                            Text(L("prof.ai_settings")).font(.body)
                             Spacer()
                             Image(systemName: "chevron.right").foregroundStyle(.secondary)
                         }
@@ -205,15 +210,16 @@ struct ProfileView: View {
 // MARK: - AI 设置面板
 struct AISettingsPanel: View {
     @StateObject private var cfg = AIConfig.shared
+    @StateObject private var langMgr = LanguageManager.shared
     @State private var apiKeyInput: String = AIConfig.shared.apiKey ?? ""
 
     var body: some View {
         VStack(spacing: 10) {
             HStack {
                 Image(systemName: "wand.and.stars").foregroundStyle(.purple)
-                Text("模型").frame(width: 52, alignment: .leading)
+                Text(L("prof.model")).frame(width: 52, alignment: .leading)
                 Spacer()
-                Picker("模型", selection: $cfg.model) {
+                Picker(L("prof.model"), selection: $cfg.model) {
                     Text("gpt-5-nano").tag("gpt-5-nano")
                 }
                 .pickerStyle(.menu)
@@ -225,10 +231,10 @@ struct AISettingsPanel: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             }
-            Toggle("执行前需要确认", isOn: $cfg.requireConfirmBeforeExecute)
+            Toggle(L("prof.confirm_exec"), isOn: $cfg.requireConfirmBeforeExecute)
             HStack {
                 Spacer()
-                Button("保存") {
+                Button(L("act.save")) {
                     cfg.setAPIKey(apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines))
                 }
                 .buttonStyle(.borderedProminent)

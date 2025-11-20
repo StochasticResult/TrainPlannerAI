@@ -1,16 +1,10 @@
-//
-//  ContentView.swift
-//  TrainPlanner
-//
-//  Created by Yuri Zhang on 8/20/25.
-//
-
 import SwiftUI
 import UIKit
 
 struct ContentView: View {
     @ObservedObject var store: ChecklistStore
     @StateObject private var profileStore = ProfileStore()
+    @StateObject private var langMgr = LanguageManager.shared
     @State private var dayOffset: Int = 0
     @State private var cachedAvatar: UIImage? = nil
 
@@ -37,9 +31,9 @@ struct ContentView: View {
     @State private var pendingOpsSummary: String = ""
     @State private var showAIReview = false
     @State private var showAILoading = false
-    @State private var aiLoadingText = "正在理解你的请求…"
+    @State private var aiLoadingText = "" // initialized in init or onAppear? No, just use default in usage
     @State private var showAITip = false
-    @State private var aiTipText = "网络有点忙，或我没理解你的意思。\n可以换个说法再试试：例如 ‘明天 9 点提醒我交水费，高优先级，标签账单’。"
+    @State private var aiTipText = ""
 
     private let swipeThreshold: CGFloat = 120
 
@@ -48,6 +42,12 @@ struct ContentView: View {
     private let topDragZoneHeight: CGFloat = 112
     private let bottomDragZoneHeight: CGFloat = 110
     @State private var isCardSwipeAllowedForCurrentGesture: Bool? = nil
+    
+    init(store: ChecklistStore) {
+        self.store = store
+        _aiLoadingText = State(initialValue: L("ui.ai_thinking"))
+        _aiTipText = State(initialValue: L("ai.tip_busy"))
+    }
 
     var body: some View {
         ZStack {
@@ -160,7 +160,7 @@ struct ContentView: View {
         NavigationView {
             VStack(alignment: .leading, spacing: 12) {
                 DatePicker(
-                    "选择日期",
+                    L("ui.select_date"),
                     selection: $selectedDate,
                     displayedComponents: [.date]
                 )
@@ -174,13 +174,13 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("今天") {
+                    Button(L("ui.today")) {
                         // 修复：点“今天”后同步更新 DatePicker 的选中日期
                         selectedDate = Date()
                         animateGoToToday()
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) { Button("完成") { isShowingDatePicker = false } }
+                ToolbarItem(placement: .confirmationAction) { Button(L("act.complete")) { isShowingDatePicker = false } }
             }
         }
         .presentationDetents([.medium, .large])
@@ -214,8 +214,8 @@ struct ContentView: View {
             HStack(spacing: 10) {
                 Button { isShowingSearch = true } label: {
                     Image(systemName: "magnifyingglass.circle.fill")
-                        .font(.system(size: 26))
-                        .foregroundStyle(.secondary)
+                    .font(.system(size: 26))
+                    .foregroundStyle(.secondary)
                 }
                 Button { isShowingProfile = true } label: {
                     if let ui = cachedAvatar {
@@ -243,8 +243,8 @@ struct ContentView: View {
         let smPrev: CGFloat = smooth(prevProg)
         let isPrevOverlayActive = prevSlideAnimX != nil
         return cardView(for: date)
-            .overlay(alignment: .topLeading) { if dragOffset.width > 40 { labelView(text: "上一天", color: profileStore.profile.theme.primary) } }
-            .overlay(alignment: .topTrailing) { if dragOffset.width < -40 { labelView(text: "下一天", color: profileStore.profile.theme.primary) } }
+            .overlay(alignment: .topLeading) { if dragOffset.width > 40 { labelView(text: L("ui.prev_day"), color: profileStore.profile.theme.primary) } }
+            .overlay(alignment: .topTrailing) { if dragOffset.width < -40 { labelView(text: L("ui.next_day"), color: profileStore.profile.theme.primary) } }
             .offset(x: moveX, y: dragOffset.height)
             .rotationEffect(.degrees(Double(moveX / width) * 8))
             // 上一张滑入时，当前卡片顺滑缩放与轻微淡出，使用平滑曲线避免突变
@@ -294,7 +294,7 @@ struct ContentView: View {
         Text(text).font(.system(size: 28, weight: .heavy)).foregroundStyle(color)
             .padding(.horizontal, 12).padding(.vertical, 4)
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(color, lineWidth: 3))
-            .rotationEffect(.degrees(text == "上一天" ? -15 : 15)).padding(24).opacity(0.9)
+            .rotationEffect(.degrees(text == L("ui.prev_day") ? -15 : 15)).padding(24).opacity(0.9)
     }
 
     // MARK: - 卡片内容
@@ -308,28 +308,28 @@ struct ContentView: View {
             onAIPrompt: { prompt, ctxDate in
                 let needConfirm = AIConfig.shared.requireConfirmBeforeExecute
                 if needConfirm {
-                    showAILoading = true; aiLoadingText = "正在理解你的请求…"
+                    showAILoading = true; aiLoadingText = L("ui.ai_thinking")
                     AIService.shared.plan(prompt: prompt, date: ctxDate, store: store) { ops, summary in
                         showAILoading = false
                         if summary.trimmingCharacters(in: .whitespacesAndNewlines) == AIService.noActionToken {
-                            aiTipText = "我好像没听懂～\n可以补充要做的事和时间，比如：‘明天 9 点提醒我交水费，优先级高’。"
+                            aiTipText = L("ai.tip_fail")
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.92)) { showAITip = true }
                             return
                         }
                         if ops.isEmpty && summary.isEmpty {
-                            aiTipText = "网络有点忙，或我没理解你的意思。\n可以换个说法再试试：例如 ‘明天 9 点提醒我交水费，高优先级，标签账单’。"
+                            aiTipText = L("ai.tip_busy")
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.92)) { showAITip = true }
                         } else {
                             pendingOps = ops; pendingOpsSummary = summary; showAIReview = true
                         }
                     }
                 } else {
-                    showAILoading = true; aiLoadingText = "正在执行…"
+                    showAILoading = true; aiLoadingText = L("ui.loading")
                     AIService.shared.handlePrompt(prompt, date: ctxDate, store: store) { finalText in
                         showAILoading = false
                         let trimmed = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
                         if trimmed == AIService.noActionToken {
-                            aiTipText = "我好像没听懂～\n可以补充要做的事和时间，比如：‘明天 9 点提醒我交水费，优先级高’。"
+                            aiTipText = L("ai.tip_fail")
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.92)) { showAITip = true }
                         } else if trimmed == "__TOOLS_EXECUTED__" {
                             // 工具已在本地执行，无需额外提示
@@ -413,11 +413,11 @@ struct ContentView: View {
         func makeBody(configuration: Configuration) -> some View {
             let gradient = LinearGradient(colors: [color.opacity(0.95), color.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
             return configuration.label.font(.system(size: iconSize, weight: .bold)).foregroundStyle(.white)
-                .frame(width: diameter, height: diameter).background(gradient).clipShape(Circle())
-                .overlay(Circle().stroke(.white.opacity(0.2), lineWidth: 1))
-                .shadow(color: color.opacity(0.35), radius: 12, x: 0, y: 8)
-                .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .frame(width: diameter, height: diameter).background(gradient).clipShape(Circle())
+            .overlay(Circle().stroke(.white.opacity(0.2), lineWidth: 1))
+            .shadow(color: color.opacity(0.35), radius: 12, x: 0, y: 8)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
         }
     }
 

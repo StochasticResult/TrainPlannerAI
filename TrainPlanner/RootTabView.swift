@@ -9,9 +9,9 @@ struct RootTabView: View {
     var body: some View {
         TabView {
             ContentShellView(store: store, profileStore: profileStore, dayContext: dayContext)
-                .tabItem { Label("计划", systemImage: "checklist") }
+                .tabItem { Label(L("tab.plan"), systemImage: "checklist") }
             NutritionTrackerView(store: nutritionStore, initialDate: dayContext.date, theme: profileStore.profile.theme)
-                .tabItem { Label("饮食", systemImage: "fork.knife") }
+                .tabItem { Label(L("tab.diet"), systemImage: "fork.knife") }
         }
     }
 }

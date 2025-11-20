@@ -34,7 +34,7 @@ enum RepeatRule: Equatable, Codable, Hashable {
 enum TaskPriority: String, Codable, CaseIterable, Identifiable {
     case none, low, medium, high
     var id: String { rawValue }
-    var displayName: String { switch self { case .none: return "无"; case .low: return "低"; case .medium: return "中"; case .high: return "高" } }
+    var displayName: String { switch self { case .none: return L("prio.none"); case .low: return L("prio.low"); case .medium: return L("prio.medium"); case .high: return L("prio.high") } }
 }
 
 struct DailyTask: Identifiable, Codable, Equatable {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NutritionTrackerView: View {
     @ObservedObject var store: NutritionStore
+    @StateObject private var langMgr = LanguageManager.shared
     let initialDate: Date
     let theme: ThemeColor
     @State private var dayOffset: Int = 0
@@ -49,24 +50,24 @@ struct NutritionTrackerView: View {
             let calGoal = max(store.dailyCalorieGoal, 1)
             let leftCal = max(0, calGoal - summary.calories)
             let calRatio = Double(summary.calories) / Double(calGoal)
-            BigNumberCard(title: "热量", valueText: "\(leftCal)", subtitle: "Calories left", ratio: calRatio, color: .orange)
+            BigNumberCard(title: L("nut.calories"), valueText: "\(leftCal)", subtitle: L("nut.left"), ratio: calRatio, color: .orange)
             // 三个 mini 卡片
             HStack(spacing: 12) {
                 let cbGoal = max(store.dailyCarbGoal, 1)
                 let cbLeft = max(0, cbGoal - summary.carbsGrams)
-                MacroMiniCard(title: "Carbs left", valueText: "\(cbLeft)g", ratio: Double(summary.carbsGrams)/Double(cbGoal), color: .blue, systemImage: "bread.slice")
+                MacroMiniCard(title: L("nut.carbs"), valueText: "\(cbLeft)g", ratio: Double(summary.carbsGrams)/Double(cbGoal), color: .blue, systemImage: "bread.slice")
                 let pGoal = max(store.dailyProteinGoal, 1)
                 let pLeft = max(0, pGoal - summary.proteinGrams)
-                MacroMiniCard(title: "Protein left", valueText: "\(pLeft)g", ratio: Double(summary.proteinGrams)/Double(pGoal), color: .pink, systemImage: "egg")
+                MacroMiniCard(title: L("nut.protein"), valueText: "\(pLeft)g", ratio: Double(summary.proteinGrams)/Double(pGoal), color: .pink, systemImage: "egg")
                 let fGoal = max(store.dailyFatGoal, 1)
                 let fLeft = max(0, fGoal - summary.fatGrams)
-                MacroMiniCard(title: "Fat left", valueText: "\(fLeft)g", ratio: Double(summary.fatGrams)/Double(fGoal), color: .purple, systemImage: "cheese")
+                MacroMiniCard(title: L("nut.fat"), valueText: "\(fLeft)g", ratio: Double(summary.fatGrams)/Double(fGoal), color: .purple, systemImage: "cheese")
             }
             Divider()
             // 分段筛选 + 小计
-            Picker("餐次", selection: $filter) {
+            Picker(L("nut.meal"), selection: $filter) {
                 ForEach(MealType.allCases) { t in Text(t.displayName).tag(t as MealType?) }
-                Text("全部").tag(nil as MealType?)
+                Text(L("nut.all")).tag(nil as MealType?)
             }
             .pickerStyle(.segmented)
             let items = store.entries(for: date)
@@ -103,7 +104,7 @@ struct NutritionTrackerView: View {
                 let sf = filtered.compactMap { $0.fatGrams }.reduce(0, +)
                 let scb = filtered.compactMap { $0.carbsGrams }.reduce(0, +)
                 HStack(spacing: 10) {
-                    chip("小计: \(sc) kcal", .orange)
+                    chip(L("nut.subtotal") + ": \(sc) kcal", .orange)
                     chip("P \(sp) g", .pink)
                     chip("F \(sf) g", .purple)
                     chip("C \(scb) g", .blue)
@@ -115,7 +116,7 @@ struct NutritionTrackerView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: expandVitamins ? "chevron.down" : "chevron.right")
-                        Text("查看微量营养素")
+                        Text(L("act.view_micro"))
                     }.font(.caption)
                 }
                 .buttonStyle(.plain)
@@ -136,17 +137,17 @@ struct NutritionTrackerView: View {
 
     private func goalsBar(summary: DayNutritionSummary) -> some View {
         HStack(spacing: 12) {
-            progressRing(title: "热量", value: Double(summary.calories), goal: Double(max(store.dailyCalorieGoal, 1)), color: .orange)
-            progressRing(title: "蛋白", value: Double(summary.proteinGrams), goal: Double(max(store.dailyProteinGoal, 1)), color: .pink)
-            progressRing(title: "脂肪", value: Double(summary.fatGrams), goal: Double(max(store.dailyFatGoal, 1)), color: .purple)
-            progressRing(title: "碳水", value: Double(summary.carbsGrams), goal: Double(max(store.dailyCarbGoal, 1)), color: .blue)
+            progressRing(title: L("nut.calories"), value: Double(summary.calories), goal: Double(max(store.dailyCalorieGoal, 1)), color: .orange)
+            progressRing(title: L("nut.protein"), value: Double(summary.proteinGrams), goal: Double(max(store.dailyProteinGoal, 1)), color: .pink)
+            progressRing(title: L("nut.fat"), value: Double(summary.fatGrams), goal: Double(max(store.dailyFatGoal, 1)), color: .purple)
+            progressRing(title: L("nut.carbs"), value: Double(summary.carbsGrams), goal: Double(max(store.dailyCarbGoal, 1)), color: .blue)
             Spacer()
             Menu {
-                Button("设热量目标 2000") { store.setGoals(calories: 2000) }
-                Button("设蛋白目标 120g") { store.setGoals(protein: 120) }
-                Button("设脂肪目标 70g") { store.setGoals(fat: 70) }
-                Button("设碳水目标 250g") { store.setGoals(carbs: 250) }
-                Button("清除目标") { store.setGoals(calories: 0, protein: 0, fat: 0, carbs: 0) }
+                Button(L("nut.set_goal_2000")) { store.setGoals(calories: 2000) }
+                Button(L("nut.set_goal_prot")) { store.setGoals(protein: 120) }
+                Button(L("nut.set_goal_fat")) { store.setGoals(fat: 70) }
+                Button(L("nut.set_goal_carb")) { store.setGoals(carbs: 250) }
+                Button(L("nut.clear_goals")) { store.setGoals(calories: 0, protein: 0, fat: 0, carbs: 0) }
             } label: {
                 Image(systemName: "gearshape").foregroundStyle(.secondary)
             }
@@ -185,7 +186,7 @@ struct NutritionTrackerView: View {
 
     private var inputBar: some View {
         HStack(spacing: 10) {
-            TextField("我吃了…（文字或用 AI）", text: $newMealText)
+            TextField(L("nut.input_placeholder"), text: $newMealText)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(addQuick)
             Button {
@@ -197,8 +198,8 @@ struct NutritionTrackerView: View {
             .buttonStyle(.bordered)
             .tint(.purple)
             Menu {
-                Button("拍照") { source = .camera; showImagePicker = true }
-                Button("相册") { source = .photoLibrary; showImagePicker = true }
+                Button(L("act.take_photo")) { source = .camera; showImagePicker = true }
+                Button(L("act.album")) { source = .photoLibrary; showImagePicker = true }
             } label: {
                 Image(systemName: "camera")
             }
@@ -238,5 +239,3 @@ struct NutritionTrackerView: View {
         newMealText = ""
     }
 }
-
-

@@ -5,7 +5,7 @@ enum MealType: String, Codable, CaseIterable, Identifiable {
     case breakfast, lunch, dinner, snack, other
     var id: String { rawValue }
     var displayName: String {
-        switch self { case .breakfast: return "早餐"; case .lunch: return "午餐"; case .dinner: return "晚餐"; case .snack: return "加餐"; case .other: return "其它" }
+        switch self { case .breakfast: return L("meal.breakfast"); case .lunch: return L("meal.lunch"); case .dinner: return L("meal.dinner"); case .snack: return L("meal.snack"); case .other: return L("meal.other") }
     }
 }
 

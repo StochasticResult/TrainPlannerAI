@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TaskNotesView: View {
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var langMgr = LanguageManager.shared
 
     let task: DailyTask
     let onSave: (String, String) -> Void
@@ -19,21 +20,21 @@ struct TaskNotesView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("标题")) {
-                    TextField("标题", text: $title)
+                Section(header: Text(L("field.title"))) {
+                    TextField(L("field.title"), text: $title)
                 }
-                Section(header: Text("内容")) {
+                Section(header: Text(L("field.content"))) {
                     TextEditor(text: $notes)
                         .frame(minHeight: 180)
                 }
             }
-            .navigationTitle("详情")
+            .navigationTitle(L("nav.details"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button(L("act.cancel")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
+                    Button(L("act.save")) {
                         onSave(title, notes)
                         dismiss()
                     }

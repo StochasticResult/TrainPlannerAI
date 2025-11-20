@@ -2,8 +2,19 @@ import SwiftUI
 
 struct StatsView: View {
     @ObservedObject var store: ChecklistStore
+    @StateObject private var langMgr = LanguageManager.shared
 
-    enum RangeKind: String, CaseIterable, Identifiable { case last7 = "近7天", last30 = "近30天", all = "全部"; var id: String { rawValue } }
+    enum RangeKind: String, CaseIterable, Identifiable { 
+        case last7, last30, all
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .last7: return L("stat.range_last7")
+            case .last30: return L("stat.range_last30")
+            case .all: return L("stat.range_all")
+            }
+        }
+    }
     @State private var range: RangeKind = .last7
 
     private var filteredTasks: [DailyTask] {
@@ -36,33 +47,33 @@ struct StatsView: View {
         NavigationView {
             List {
                 Section {
-                    Picker("范围", selection: $range) {
-                        ForEach(RangeKind.allCases) { r in Text(r.rawValue).tag(r) }
+                    Picker(L("stat.range"), selection: $range) {
+                        ForEach(RangeKind.allCases) { r in Text(r.label).tag(r) }
                     }
                     .pickerStyle(.segmented)
                 }
-                Section(header: Text("整体")) {
+                Section(header: Text(L("stat.overall"))) {
                     HStack {
-                        Text("总任务")
+                        Text(L("stat.total_tasks"))
                         Spacer()
                         Text("\(total)")
                     }
                     HStack {
-                        Text("已完成")
+                        Text(L("stat.completed"))
                         Spacer()
                         Text("\(doneCount)")
                     }
                     HStack {
-                        Text("未完成")
+                        Text(L("stat.incomplete"))
                         Spacer()
                         Text("\(todoCount)")
                     }
                     ProgressView(value: total == 0 ? 0 : Double(doneCount) / Double(total)) {
-                        Text("完成率")
+                        Text(L("stat.completion_rate"))
                     }
                 }
 
-                Section(header: Text("优先级")) {
+                Section(header: Text(L("stat.priority_dist"))) {
                     ForEach(priorityCounts, id: \.0) { (p, c) in
                         HStack {
                             Text(p.displayName)
@@ -72,7 +83,7 @@ struct StatsView: View {
                     }
                 }
 
-                Section(header: Text("标签 Top 10")) {
+                Section(header: Text(L("stat.tags_top10"))) {
                     ForEach(Array(labelCounts.prefix(10)), id: \.0) { (label, c) in
                         HStack {
                             Text(label)
@@ -81,11 +92,11 @@ struct StatsView: View {
                         }
                     }
                     if labelCounts.isEmpty {
-                        Text("暂无标签数据").foregroundStyle(.secondary)
+                        Text(L("stat.no_tags")).foregroundStyle(.secondary)
                     }
                 }
             }
-            .navigationTitle("统计")
+            .navigationTitle(L("tab.stats"))
         }
     }
 
@@ -98,5 +109,3 @@ struct StatsView: View {
         }
     }
 }
-
-

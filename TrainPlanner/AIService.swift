@@ -1,5 +1,5 @@
 import Foundation
-import Security
+import SwiftUI // For localization L()
 
 // MARK: - Keychain (简单封装)
 enum Keychain {
@@ -210,7 +210,7 @@ final class AIService: ObservableObject {
 
     // 入口：处理自然语言意图
     func handlePrompt(_ prompt: String, date: Date, store: ChecklistStore, completion: @escaping (String) -> Void) {
-        guard let apiKey = AIConfig.shared.apiKey else { completion("未配置 API Key"); return }
+        guard let apiKey = AIConfig.shared.apiKey else { completion(L("ai.no_key")); return }
         let model = AIConfig.shared.model
 
         let messages: [ChatMessage] = [
@@ -229,7 +229,7 @@ final class AIService: ObservableObject {
         // 执行循环：工具调用 -> 本地执行 -> 返回结果 -> 直到无工具
         func loop(_ messagesSoFar: [ChatMessage]) {
             request(messages: messagesSoFar, tools: tools, model: model, apiKey: apiKey) { resp in
-                guard let resp = resp else { completion("AI 请求失败"); return }
+                guard let resp = resp else { completion(L("ai.fail_req")); return }
                 if let toolCalls = resp.choices.first?.message.tool_calls, !toolCalls.isEmpty {
                     // 在本地顺序执行工具，并立即结束（减少二次请求与消息编排复杂度）
                     for call in toolCalls {
@@ -253,7 +253,7 @@ final class AIService: ObservableObject {
     struct Operation: Identifiable { let id = UUID(); let kind: OperationKind; let summary: String; let detail: String; let payload: [String: String] }
 
     func plan(prompt: String, date: Date, store: ChecklistStore, completion: @escaping ([Operation], String) -> Void) {
-        guard let apiKey = AIConfig.shared.apiKey else { completion([], "未配置 API Key"); return }
+        guard let apiKey = AIConfig.shared.apiKey else { completion([], L("ai.no_key")); return }
         let model = AIConfig.shared.model
         let messages: [ChatMessage] = [
             ChatMessage(role: "system", content: systemPrompt),
@@ -267,7 +267,7 @@ final class AIService: ObservableObject {
             )
         ]
         request(messages: messages, tools: tools, model: model, apiKey: apiKey) { [self] resp in
-            guard let resp = resp else { completion([], "AI 请求失败"); return }
+            guard let resp = resp else { completion([], L("ai.fail_req")); return }
             var ops: [Operation] = []
             if let calls = resp.choices.first?.message.tool_calls, !calls.isEmpty {
                 for c in calls {
@@ -282,13 +282,13 @@ final class AIService: ObservableObject {
                     case "create_task":
                         struct A: Decodable { let title: String; let start_date: String; let due_date: String?; let repeat_rule: String; let repeat_interval: Int?; let repeat_end_date: String?; let priority: String?; let notes: String?; let labels: [String]?; let duration_minutes: Int?; let reminder_offsets: [Int]? }
                         if let a = try? JSONDecoder().decode(A.self, from: Data(args.utf8)) {
-                            let s = "创建任务 · \(a.title)"
+                            let s = L("ai.summary.create") + " · \(a.title)"
                             let d = [
-                                "开始日": a.start_date,
-                                "截止": a.due_date ?? "无",
-                                "重复": a.repeat_rule + (a.repeat_interval != nil ? "(\(a.repeat_interval!))" : ""),
-                                "结束": a.repeat_end_date ?? "无",
-                                "优先级": a.priority ?? "none"
+                                L("ai.field.start"): a.start_date,
+                                L("ai.field.due"): a.due_date ?? L("ai.val.none"),
+                                L("ai.field.repeat"): a.repeat_rule + (a.repeat_interval != nil ? "(\(a.repeat_interval!))" : ""),
+                                L("ai.field.end"): a.repeat_end_date ?? L("ai.val.none"),
+                                L("ai.field.priority"): a.priority ?? "none"
                             ].map { "\($0.key)：\($0.value)" }.joined(separator: "\n")
                             add(kind: .create, summary: s, detail: d, payload: [
                                 "title": a.title,
@@ -308,15 +308,15 @@ final class AIService: ObservableObject {
                         struct A: Decodable { let id: String; let title: String?; let start_date: String?; let due_date: String?; let repeat_rule: String?; let repeat_interval: Int?; let repeat_end_date: String?; let priority: String?; let notes: String?; let labels: [String]?; let duration_minutes: Int?; let reminder_offsets: [Int]? }
                         if let a = try? JSONDecoder().decode(A.self, from: Data(args.utf8)) {
                             let currentTitle = UUID(uuidString: a.id).flatMap { store.tasksById[$0]?.title } ?? "(未知)"
-                            let s = "更新任务 · \(currentTitle)"
+                            let s = L("ai.summary.update") + " · \(currentTitle)"
                             let d = [
-                                a.title.map { "标题 → \($0)" },
-                                a.start_date.map { "开始 → \($0)" },
-                                a.due_date.map { "截止 → \($0)" },
-                                a.repeat_rule.map { r in "重复 → \(r)\(a.repeat_interval != nil ? "(\(a.repeat_interval!))" : "")" },
-                                a.repeat_end_date.map { "结束 → \($0)" },
-                                a.priority.map { "优先级 → \($0)" },
-                                a.notes.map { _ in "备注将更新" }
+                                a.title.map { L("field.title") + " → \($0)" },
+                                a.start_date.map { L("ai.field.start") + " → \($0)" },
+                                a.due_date.map { L("ai.field.due") + " → \($0)" },
+                                a.repeat_rule.map { r in L("ai.field.repeat") + " → \(r)\(a.repeat_interval != nil ? "(\(a.repeat_interval!))" : "")" },
+                                a.repeat_end_date.map { L("ai.field.end") + " → \($0)" },
+                                a.priority.map { L("ai.field.priority") + " → \($0)" },
+                                a.notes.map { _ in L("ai.msg.notes_update") }
                             ].compactMap { $0 }.joined(separator: "\n")
                             add(kind: .update, summary: s, detail: d, payload: [
                                 "id": a.id,
@@ -337,24 +337,24 @@ final class AIService: ObservableObject {
                         struct A: Decodable { let id: String; let completed_on: String? }
                         if let a = try? JSONDecoder().decode(A.self, from: Data(args.utf8)) {
                             let t = UUID(uuidString: a.id).flatMap { store.tasksById[$0]?.title } ?? a.id
-                            add(kind: .complete, summary: "完成任务 · \(t)", detail: "完成于 \(a.completed_on ?? self.isoDate(date))", payload: ["id": a.id])
+                            add(kind: .complete, summary: L("ai.summary.complete") + " · \(t)", detail: L("ai.msg.completed_on") + " \(a.completed_on ?? self.isoDate(date))", payload: ["id": a.id])
                         }
                     case "delete_task":
                         struct A: Decodable { let id: String }
                         if let a = try? JSONDecoder().decode(A.self, from: Data(args.utf8)) {
                             let t = UUID(uuidString: a.id).flatMap { store.tasksById[$0]?.title } ?? a.id
-                            add(kind: .delete, summary: "删除任务 · \(t)", detail: "将移动到最近删除", payload: ["id": a.id])
+                            add(kind: .delete, summary: L("ai.summary.delete") + " · \(t)", detail: L("ai.msg.moved_trash"), payload: ["id": a.id])
                         }
                     case "restore_task":
                         struct A: Decodable { let id: String }
                         if let a = try? JSONDecoder().decode(A.self, from: Data(args.utf8)) {
-                            add(kind: .restore, summary: "恢复任务", detail: a.id, payload: ["id": a.id])
+                            add(kind: .restore, summary: L("ai.summary.restore"), detail: a.id, payload: ["id": a.id])
                         }
                     case "set_non_repeating_and_truncate":
                         struct A: Decodable { let id: String; let on_date: String }
                         if let a = try? JSONDecoder().decode(A.self, from: Data(args.utf8)) {
                             let t = UUID(uuidString: a.id).flatMap { store.tasksById[$0]?.title } ?? a.id
-                            add(kind: .truncate, summary: "设为不重复并截断 · \(t)", detail: "结束日 → \(a.on_date)", payload: ["id": a.id, "on_date": a.on_date])
+                            add(kind: .truncate, summary: L("ai.summary.truncate") + " · \(t)", detail: L("field.end_date") + " → \(a.on_date)", payload: ["id": a.id, "on_date": a.on_date])
                         }
                     default:
                         break
@@ -765,5 +765,3 @@ final class AIService: ObservableObject {
         }
     }
 }
-
-

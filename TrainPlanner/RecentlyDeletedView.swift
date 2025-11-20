@@ -3,6 +3,7 @@ import SwiftUI
 struct RecentlyDeletedView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var checklist: ChecklistStore
+    @StateObject private var langMgr = LanguageManager.shared
 
     @State private var showClearAlert = false
     @State private var showSingleDeleteAlert = false
@@ -18,7 +19,7 @@ struct RecentlyDeletedView: View {
                 if checklist.recentlyDeleted.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "trash").font(.system(size: 42)).foregroundStyle(.secondary)
-                        Text("暂无最近删除").foregroundStyle(.secondary)
+                        Text(L("ui.empty_deleted")).foregroundStyle(.secondary)
                     }
                 } else {
                     List {
@@ -29,7 +30,7 @@ struct RecentlyDeletedView: View {
                                     Text(item.deletedAt, style: .date).font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Button("恢复") {
+                                Button(L("act.restore")) {
                                     // 确保不会弹出删除确认
                                     pendingDeleteId = nil
                                     showSingleDeleteAlert = false
@@ -40,7 +41,7 @@ struct RecentlyDeletedView: View {
                                 Button(role: .destructive) {
                                     pendingDeleteId = item.id
                                     showSingleDeleteAlert = true
-                                } label: { Text("删除") }
+                                } label: { Text(L("act.delete")) }
                                 .buttonStyle(.borderless)
                             }
                         }
@@ -52,32 +53,30 @@ struct RecentlyDeletedView: View {
                     .listStyle(.insetGrouped)
                 }
             }
-            .navigationTitle("最近删除")
+            .navigationTitle(L("nav.deleted"))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(L("act.close")) { dismiss() } }
                 ToolbarItem(placement: .destructiveAction) {
                     if !checklist.recentlyDeleted.isEmpty {
-                        Button("清空") { showClearAlert = true }
+                        Button(L("act.clear")) { showClearAlert = true }
                     }
                 }
             }
         }
-        .alert("清空最近删除？", isPresented: $showClearAlert) {
-            Button("取消", role: .cancel) {}
-            Button("清空", role: .destructive) { checklist.purgeAllTrash() }
+        .alert(L("alert.clear_trash"), isPresented: $showClearAlert) {
+            Button(L("act.cancel"), role: .cancel) {}
+            Button(L("act.clear"), role: .destructive) { checklist.purgeAllTrash() }
         } message: {
-            Text("此操作不可撤销")
+            Text(L("alert.irreversible"))
         }
-        .alert("彻底删除此项目？", isPresented: $showSingleDeleteAlert) {
-            Button("取消", role: .cancel) { pendingDeleteId = nil }
-            Button("删除", role: .destructive) {
+        .alert(L("alert.delete_item"), isPresented: $showSingleDeleteAlert) {
+            Button(L("act.cancel"), role: .cancel) { pendingDeleteId = nil }
+            Button(L("act.delete"), role: .destructive) {
                 if let id = pendingDeleteId { checklist.purgeTrash(id: id) }
                 pendingDeleteId = nil
             }
         } message: {
-            Text("该操作不可恢复")
+            Text(L("alert.irreversible"))
         }
     }
 }
-
-

@@ -60,7 +60,7 @@ public struct EmptyIllustrationView: View {
                         .font(.system(size: 28, weight: .semibold))
                         .foregroundStyle(theme)
                 }
-                Text("这里还没有任务")
+                Text(L("ui.empty_tasks"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

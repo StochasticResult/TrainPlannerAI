@@ -5,6 +5,9 @@ struct AIReviewSheet: View {
     let aiSummary: String
     let onCancel: () -> Void
     let onConfirm: () -> Void
+    
+    // Use LanguageManager to update UI on change, though this sheet usually dismisses
+    @StateObject private var langMgr = LanguageManager.shared
 
     var body: some View {
         NavigationView {
@@ -19,9 +22,9 @@ struct AIReviewSheet: View {
                 List {
                     if operations.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("没有可执行的更改")
+                            Text(L("ai.no_changes"))
                                 .font(.headline)
-                            Text("如果这是错误，请重试或修改指令。若问题持续，请在设置中关闭‘执行前确认’直接执行。")
+                            Text(L("ai.no_changes_hint"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -41,11 +44,11 @@ struct AIReviewSheet: View {
                 }
                 .listStyle(.insetGrouped)
             }
-            .navigationTitle("将要执行的更改")
+            .navigationTitle(L("ai.review_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消", action: onCancel) }
-                ToolbarItem(placement: .confirmationAction) { Button("确认执行", action: onConfirm) }
+                ToolbarItem(placement: .cancellationAction) { Button(L("act.cancel"), action: onCancel) }
+                ToolbarItem(placement: .confirmationAction) { Button(L("act.confirm"), action: onConfirm) }
             }
         }
         .presentationDetents([.medium, .large])
@@ -73,5 +76,3 @@ struct AIReviewSheet: View {
         }
     }
 }
-
-
